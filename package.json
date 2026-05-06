@@ -1,0 +1,119 @@
+{
+  "name": "opencode-ui",
+  "displayName": "OpenCode UI",
+  "description": "Claude-Code-style chat UI for the opencode AI coding agent — sessions, model picker, plan/build modes, per-session editor tabs, live tool stream, permission prompts.",
+  "version": "0.1.0",
+  "publisher": "opencode-temp",
+  "license": "MIT",
+  "icon": "media/icon.png",
+  "homepage": "https://github.com/opencode-temp/opencode-ui#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/opencode-temp/opencode-ui.git"
+  },
+  "bugs": {
+    "url": "https://github.com/opencode-temp/opencode-ui/issues"
+  },
+  "keywords": [
+    "opencode",
+    "ai",
+    "agent",
+    "chat",
+    "coding-assistant",
+    "claude",
+    "llm"
+  ],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": ["AI", "Chat", "Other"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "viewsContainers": {
+      "panel": [],
+      "activitybar": [
+        {
+          "id": "opencode",
+          "title": "OpenCode",
+          "icon": "media/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "opencode": [
+        {
+          "id": "opencode.main",
+          "name": "OpenCode",
+          "type": "webview"
+        }
+      ]
+    },
+    "commands": [
+      { "command": "opencode.show", "title": "OpenCode: Show", "category": "OpenCode" },
+      { "command": "opencode.newSession", "title": "OpenCode: New Session", "category": "OpenCode" },
+      { "command": "opencode.restartServer", "title": "OpenCode: Restart Server", "category": "OpenCode" },
+      { "command": "opencode.switchModel", "title": "OpenCode: Switch Model", "category": "OpenCode" }
+    ],
+    "configuration": {
+      "title": "OpenCode",
+      "properties": {
+        "opencode-ui.binaryPath": {
+          "type": "string",
+          "default": "opencode",
+          "description": "Path to the opencode binary."
+        },
+        "opencode-ui.port": {
+          "type": "number",
+          "default": 0,
+          "description": "Port for `opencode serve`. 0 = pick a free port automatically (or use portRange below)."
+        },
+        "opencode-ui.portRange": {
+          "type": "string",
+          "default": "",
+          "description": "Port range to try sequentially when port is 0, e.g. \"41234-41260\". Useful when opening multiple repos at once. Empty = OS picks any free port."
+        },
+        "opencode-ui.maxStartAttempts": {
+          "type": "number",
+          "default": 8,
+          "description": "How many ports to try before giving up when using portRange."
+        },
+        "opencode-ui.httpProxy": {
+          "type": "string",
+          "default": "",
+          "description": "If set, use an existing opencode server at this port instead of spawning one."
+        },
+        "opencode-ui.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start opencode serve when the extension activates."
+        },
+        "opencode-ui.defaultModel": {
+          "type": "string",
+          "default": "",
+          "description": "Default model id (e.g. 'anthropic/claude-opus-4-7'). Empty = use opencode's default."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "build:ext": "esbuild src/extension.ts --bundle --platform=node --target=node18 --external:vscode --format=cjs --outfile=out/extension.js",
+    "build:web": "esbuild src/webview/main.tsx --bundle --target=es2020 --format=iife --outfile=media/webview.js --loader:.css=text",
+    "build": "npm run build:ext && npm run build:web",
+    "watch:ext": "npm run build:ext -- --watch",
+    "watch:web": "npm run build:web -- --watch",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/vscode": "^1.85.0",
+    "esbuild": "^0.21.0",
+    "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}
