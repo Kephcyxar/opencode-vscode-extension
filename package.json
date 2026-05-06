@@ -1,18 +1,18 @@
 {
-  "name": "opencode-ui",
-  "displayName": "OpenCode UI",
-  "description": "Claude-Code-style chat UI for the opencode AI coding agent — sessions, model picker, plan/build modes, per-session editor tabs, live tool stream, permission prompts.",
-  "version": "0.1.0",
-  "publisher": "opencode-temp",
+  "name": "kephcyxar-opencode-ui",
+  "displayName": "OpenCode UI - CodeFude",
+  "description": "Chat UI for the opencode AI coding agent.",
+  "version": "0.0.4",
+  "publisher": "CodeFude",
   "license": "MIT",
   "icon": "media/icon.png",
-  "homepage": "https://github.com/opencode-temp/opencode-ui#readme",
+  "homepage": "https://github.com/Kephcyxar/opencode-vscode-extension#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/opencode-temp/opencode-ui.git"
+    "url": "https://github.com/Kephcyxar/opencode-vscode-extension.git"
   },
   "bugs": {
-    "url": "https://github.com/opencode-temp/opencode-ui/issues"
+    "url": "https://github.com/Kephcyxar/opencode-vscode-extension/issues"
   },
   "keywords": [
     "opencode",
@@ -20,7 +20,6 @@
     "agent",
     "chat",
     "coding-assistant",
-    "claude",
     "llm"
   ],
   "engines": {
@@ -91,7 +90,7 @@
         "opencode-ui.defaultModel": {
           "type": "string",
           "default": "",
-          "description": "Default model id (e.g. 'anthropic/claude-opus-4-7'). Empty = use opencode's default."
+          "description": "Default model id used by opencode. Empty = use opencode's default."
         }
       }
     }
@@ -102,7 +101,8 @@
     "build": "npm run build:ext && npm run build:web",
     "watch:ext": "npm run build:ext -- --watch",
     "watch:web": "npm run build:web -- --watch",
-    "package": "vsce package"
+    "package": "vsce package",
+    "test": "node test/noop-test.js"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",

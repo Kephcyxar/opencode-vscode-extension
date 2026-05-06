@@ -1,8 +1,12 @@
 # OpenCode UI
 
-A polished VS Code chat interface for the open-source [opencode](https://opencode.ai) AI coding agent. Spawns `opencode serve` in the background, talks to it over HTTP + Server-Sent Events, and renders a Claude-Code-style experience inside VS Code: a sessions sidebar, per-session editor tabs, live tool streaming with proper diff rendering, plan/build modes, a model picker, and permission prompts.
+A polished VS Code chat interface for the open-source [opencode](https://opencode.ai) AI coding agent. Spawns `opencode serve` in the background, talks to it over HTTP + Server-Sent Events, and renders a clean chat experience inside VS Code: a sessions sidebar, per-session editor tabs, live tool streaming with proper diff rendering, plan/build modes, a model picker, and permission prompts.
 
 > **Status:** preview. Works on Linux, macOS, and Windows. Requires [opencode](https://opencode.ai) installed locally.
+
+## Screenshots
+
+![OpenCode session with todo list](https://raw.githubusercontent.com/Kephcyxar/opencode-vscode-extension/main/images/demo-session.png)
 
 ## Features
 
