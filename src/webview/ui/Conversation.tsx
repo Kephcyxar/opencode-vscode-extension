@@ -160,7 +160,66 @@ function ToolPart({ part }: { part: any }) {
   if (tool === "websearch" || tool === "web_search") return <WebSearchTool input={input} output={output} />;
   if (tool === "webfetch" || tool === "web_fetch") return <WebFetchTool input={input} output={output} />;
   if (tool === "glob") return <GlobTool input={input} output={output} />;
+  if (tool === "task") return <TaskTool input={input} output={output} state={state} />;
+  if (tool === "grep") return <GrepTool input={input} output={output} />;
   return <GenericTool part={part} />;
+}
+
+function TaskTool({ input, output, state }: { input: any; output: any; state: any }) {
+  const [open, setOpen] = React.useState(false);
+  const desc: string = input.description || state.title || "Task";
+  const subagent: string = input.subagent_type || input.subagentType || input.agent || "";
+  const prompt: string = input.prompt || "";
+  const out = typeof output === "string" ? output : output ? tryStr(output) : "";
+  const taskResult = (() => {
+    const m = out.match(/<task_result>([\s\S]*?)<\/task_result>/);
+    return m ? m[1].trim() : out.trim();
+  })();
+  return (
+    <div className="tool tool-task">
+      <div className="tool-head" onClick={() => setOpen((v) => !v)} style={{ cursor: "pointer" }}>
+        <span className="tool-tag task">TASK</span>
+        <span className="tool-desc">{desc}</span>
+        {subagent && <span className="tool-chip">{subagent}</span>}
+        <span className="task-caret">{open ? "▾" : "▸"}</span>
+      </div>
+      {open && prompt && (
+        <div className="task-prompt">
+          <div className="task-section-label">Prompt</div>
+          <div className="task-prompt-body">{prompt}</div>
+        </div>
+      )}
+      {taskResult && (
+        <div className="task-result">
+          {open && <div className="task-section-label">Result</div>}
+          <Markdown text={taskResult} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GrepTool({ input, output }: { input: any; output: any }) {
+  const pattern: string = input.pattern || input.query || "";
+  const path: string = input.path || "";
+  const include: string = input.include || input.glob || "";
+  const raw = typeof output === "string" ? output : output ? tryStr(output) : "";
+  const lines = raw.split("\n").map((s) => s.trim()).filter((s) => s.length > 0 && !/^no\b/i.test(s));
+  return (
+    <div className="tool tool-grep">
+      <div className="tool-head">
+        <span className="tool-tag read">GREP</span>
+        <span className="tool-desc"><code>{pattern}</code>{path ? <> in <code>{path}</code></> : null}{include ? <> · <code>{include}</code></> : null}</span>
+        {lines.length > 0 && <span className="tool-chip">{lines.length} hit{lines.length === 1 ? "" : "s"}</span>}
+      </div>
+      {lines.length > 0 && (
+        <div className="glob-list">
+          {lines.slice(0, 50).map((f, i) => <div key={i} className="glob-file">{f}</div>)}
+          {lines.length > 50 && <div className="glob-file dim">… and {lines.length - 50} more</div>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function GlobTool({ input, output }: { input: any; output: any }) {

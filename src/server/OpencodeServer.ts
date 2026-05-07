@@ -15,12 +15,22 @@ export class OpencodeServer {
   private readonly _emitter = new vscode.EventEmitter<{ state: ServerState; message?: string }>();
   readonly onStateChange = this._emitter.event;
 
+  private userStopped = false;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private reconnectAttempt = 0;
+  private static readonly MAX_RECONNECT_ATTEMPTS = 5;
+
   constructor(private readonly output: vscode.OutputChannel) {}
 
   get state(): ServerState { return this._state; }
   get url(): string { return this._url; }
 
   async start(): Promise<void> {
+    this.userStopped = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
     const cfg = vscode.workspace.getConfiguration("opencode-ui");
     const externalProxy = (cfg.get<string>("httpProxy") || "").trim();
     if (externalProxy) {
@@ -59,6 +69,36 @@ export class OpencodeServer {
     }
 
     this.setState("error", `opencode failed to start on ${ports.length} port(s) (tried: ${ports.join(", ")})`);
+    this.scheduleReconnect();
+  }
+
+  private scheduleReconnect() {
+    if (this.userStopped) return;
+    if (this.reconnectTimer) return;
+    if (this.reconnectAttempt >= OpencodeServer.MAX_RECONNECT_ATTEMPTS) {
+      this.output.appendLine(`[opencode] giving up auto-reconnect after ${this.reconnectAttempt} attempt(s)`);
+      return;
+    }
+    const delay = Math.min(60_000, 5_000 * Math.pow(2, this.reconnectAttempt));
+    this.reconnectAttempt++;
+    this.output.appendLine(`[opencode] auto-reconnect in ${Math.round(delay / 1000)}s (attempt ${this.reconnectAttempt}/${OpencodeServer.MAX_RECONNECT_ATTEMPTS})`);
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      if (this.userStopped) return;
+      this.start().then(() => {
+        if (this._state === "ready") this.reconnectAttempt = 0;
+      }).catch((e) => {
+        this.output.appendLine(`[opencode] reconnect attempt failed: ${e?.message || e}`);
+      });
+    }, delay);
+  }
+
+  private cancelReconnect() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.reconnectAttempt = 0;
   }
 
   private async tryStart(bin: string, port: number): Promise<boolean> {
@@ -81,7 +121,10 @@ export class OpencodeServer {
       this.output.appendLine(`[opencode] exited (code=${code} signal=${signal})`);
       if (this.proc === proc) this.proc = null;
       earlyExit = true;
-      if (this._state === "ready") this.setState("stopped");
+      if (this._state === "ready") {
+        this.setState("stopped");
+        this.scheduleReconnect();
+      }
     });
     proc.on("error", (e) => {
       this.output.appendLine(`[opencode] spawn error: ${e.message}`);
@@ -122,6 +165,8 @@ export class OpencodeServer {
   }
 
   async stop(): Promise<void> {
+    this.userStopped = true;
+    this.cancelReconnect();
     if (this.proc) {
       this.proc.kill("SIGTERM");
       this.proc = null;

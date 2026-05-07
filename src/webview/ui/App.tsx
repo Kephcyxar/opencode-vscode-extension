@@ -124,6 +124,10 @@ export function App() {
   }, [currentModelMeta]);
 
   const reasoningSupported = !!currentModelMeta?.capabilities?.reasoning;
+  const thinkingToggleSupported = React.useMemo(() => {
+    const v = currentModelMeta?.variants || {};
+    return Object.keys(v).some((k) => /^(none|off|disabled|minimal)$/i.test(k));
+  }, [currentModelMeta]);
 
   React.useEffect(() => {
     if (!model) return;
@@ -136,14 +140,14 @@ export function App() {
     } else {
       setVariant(null);
     }
-    if (reasoningSupported && variantKeys.length === 0) {
+    if (thinkingToggleSupported) {
       let saved: string | null = null;
       try { saved = localStorage.getItem(`opencode.thinking.${model.providerID}/${model.modelID}`); } catch {}
       setThinking(saved == null ? true : saved === "1");
     } else {
       setThinking(true);
     }
-  }, [model?.providerID, model?.modelID, variantKeys.join(","), reasoningSupported]);
+  }, [model?.providerID, model?.modelID, variantKeys.join(","), thinkingToggleSupported]);
 
   const onVariantChange = (v: string | null) => {
     setVariant(v);
@@ -171,7 +175,12 @@ export function App() {
       modelID: model.modelID,
     };
     if (variant) payload.variant = variant;
-    if (reasoningSupported && variantKeys.length === 0) payload.thinking = thinking;
+    else if (thinkingToggleSupported && !thinking) {
+      const v = currentModelMeta?.variants || {};
+      const offKey = Object.keys(v).find((k) => /^(none|off|disabled|minimal)$/i.test(k));
+      if (offKey) payload.variant = offKey;
+    }
+    if (thinkingToggleSupported) payload.thinking = thinking;
     post(payload);
   };
 
@@ -288,7 +297,7 @@ export function App() {
         variants={variantKeys}
         variant={variant}
         onVariantChange={onVariantChange}
-        thinkingSupported={reasoningSupported && variantKeys.length === 0}
+        thinkingSupported={thinkingToggleSupported}
         thinking={thinking}
         onThinkingChange={onThinkingChange}
       />

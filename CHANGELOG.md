@@ -1,9 +1,15 @@
 # Changelog
 
+## 0.0.10
+
+- Thinking on/off toggle now only appears when the current model's `variants` map exposes a disable key (`none`/`off`/`disabled`/`minimal`). Previously it showed for any reasoning-capable model and silently did nothing on providers that don't honor `thinking: false` (e.g. Big Pickle, MiniMax, Kimi, GLM, Qwen). When off, the disable variant is now sent as `model.variant` — the only wire format opencode currently honors
+- Polished `task` (subagent) tool rendering — collapsible card with description, subagent type chip, and the result rendered as markdown. Strips the `<task_result>` wrapper and hides the verbose prompt + `task_id` line by default (click the header to expand)
+- Polished `grep` tool rendering — pattern/path/include header with a hit count and a clean line list (replaces the raw JSON dump)
+- Auto-reconnect: if the opencode server process exits unexpectedly (e.g. killed externally), the extension now retries `start()` with exponential backoff (5s → 10s → 20s → 40s → 60s, max 5 attempts) instead of staying in the stopped state. Manual stop/restart cancels the loop, and a successful reconnect resets the attempt counter
+
 ## 0.0.9
 
 - Reasoning effort selector (low/medium/high/max) appears between the build/plan toggle and the model dropdown when the current model exposes `variants` (e.g. DeepSeek V4 Pro/Flash, MiMo V2.5, Hy3 preview, Nemotron 3 Super). Choice is persisted per model and sent as `model.variant` with each message; switching to a model without variants hides the selector and clears the saved effort
-- Thinking on/off toggle appears for models that report `reasoning: true` but expose no variants. Sends `thinking` and `providerOptions.thinking` flags; behavior depends on the upstream provider supporting a disable path
 - Bug fix: empty trailing "Thinking:" blocks no longer render under assistant messages (whitespace-only reasoning parts are skipped)
 
 ## 0.0.8
