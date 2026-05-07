@@ -50,17 +50,22 @@ export class OpencodeClient {
   listMessages(sessionId: string): Promise<Message[] | { info?: Message; parts?: any[] }[]> {
     return this.request("GET", `/session/${sessionId}/message`);
   }
-  sendMessage(sessionId: string, args: { text: string; mode: Mode; providerID: string; modelID: string }): Promise<any> {
+  sendMessage(sessionId: string, args: { text: string; mode: Mode; providerID: string; modelID: string; variant?: string; thinking?: boolean }): Promise<any> {
     const body: any = {
       parts: [{ type: "text", text: args.text }],
       mode: args.mode,
       agent: args.mode, // newer opencode uses "agent" field; send both
     };
     if (args.providerID && args.modelID) {
-      // opencode expects nested { model: { providerID, modelID } }; also send flat for older versions
-      body.model = { providerID: args.providerID, modelID: args.modelID };
+      const model: any = { providerID: args.providerID, modelID: args.modelID };
+      if (args.variant) model.variant = args.variant;
+      body.model = model;
       body.providerID = args.providerID;
       body.modelID = args.modelID;
+    }
+    if (typeof args.thinking === "boolean") {
+      body.thinking = args.thinking;
+      body.providerOptions = { ...(body.providerOptions || {}), thinking: args.thinking ? { type: "enabled" } : { type: "disabled" } };
     }
     return this.request("POST", `/session/${sessionId}/message`, body);
   }

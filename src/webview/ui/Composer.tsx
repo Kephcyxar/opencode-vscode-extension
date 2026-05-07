@@ -9,9 +9,19 @@ interface Props {
   onPickModel: () => void;
   onSend: (text: string) => void;
   onAbort: () => void;
+  variants?: string[];
+  variant?: string | null;
+  onVariantChange?: (v: string | null) => void;
+  thinkingSupported?: boolean;
+  thinking?: boolean;
+  onThinkingChange?: (on: boolean) => void;
 }
 
-export function Composer({ disabled, working, mode, onModeChange, modelLabel, onPickModel, onSend, onAbort }: Props) {
+export function Composer({
+  disabled, working, mode, onModeChange, modelLabel, onPickModel, onSend, onAbort,
+  variants, variant, onVariantChange,
+  thinkingSupported, thinking, onThinkingChange,
+}: Props) {
   const [text, setText] = React.useState("");
   const ref = React.useRef<HTMLTextAreaElement>(null);
 
@@ -61,6 +71,26 @@ export function Composer({ disabled, working, mode, onModeChange, modelLabel, on
             <button className={mode === "build" ? "active" : ""} onClick={() => onModeChange("build")}>build</button>
             <button className={mode === "plan" ? "active" : ""} onClick={() => onModeChange("plan")}>plan</button>
           </div>
+          {variants && variants.length > 0 && (
+            <div className="effort-toggle" title="Reasoning effort">
+              {variants.map((v) => (
+                <button
+                  key={v}
+                  className={variant === v ? "active" : ""}
+                  onClick={() => onVariantChange?.(v)}
+                >{v}</button>
+              ))}
+            </div>
+          )}
+          {thinkingSupported && (!variants || variants.length === 0) && (
+            <button
+              className={`think-toggle ${thinking ? "on" : "off"}`}
+              title={thinking ? "Thinking enabled — click to disable" : "Thinking disabled — click to enable"}
+              onClick={() => onThinkingChange?.(!thinking)}
+            >
+              <span className="dot" /> think {thinking ? "on" : "off"}
+            </button>
+          )}
           <span className="pill" onClick={onPickModel} title="Switch model (Ctrl/Cmd+M)">
             {modelLabel} ▾
           </span>

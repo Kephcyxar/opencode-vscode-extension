@@ -3,7 +3,7 @@ import { post } from "./vscode";
 import { Sessions } from "./Sessions";
 import { Conversation } from "./Conversation";
 import { Composer } from "./Composer";
-import { ModelPicker } from "./ModelPicker";
+import { ModelPicker, getDefaultModelKey } from "./ModelPicker";
 
 type ServerState = "starting" | "ready" | "error" | "stopped";
 
@@ -21,6 +21,8 @@ export function App() {
   const [picker, setPicker] = React.useState(false);
   const [mode, setMode] = React.useState<"build" | "plan">("build");
   const [model, setModel] = React.useState<{ providerID: string; modelID: string; label: string } | null>(null);
+  const [variant, setVariant] = React.useState<string | null>(null);
+  const [thinking, setThinking] = React.useState<boolean>(true);
   const [working, setWorking] = React.useState(false);
   const [pendingPerms, setPendingPerms] = React.useState<any[]>([]);
   const [pendingQuestions, setPendingQuestions] = React.useState<any[]>([]);
@@ -41,7 +43,11 @@ export function App() {
           setSessions(m.sessions);
           break;
         case "messages":
-          if (m.sessionId === activeId) setMessages(m.messages);
+          if (m.sessionId === activeId) {
+            setMessages(m.messages);
+            const last = m.messages[m.messages.length - 1];
+            if (last?.error) setWorking(false);
+          }
           break;
         case "permission":
           if (m.sessionId === activeId) {
@@ -70,10 +76,26 @@ export function App() {
         }
         case "providers":
           setProviders(m.providers);
-          if (!model && m.providers?.[0]) {
-            const p = m.providers[0];
-            const firstModel = Object.values(p.models || {})[0] as any;
-            if (firstModel) setModel({ providerID: p.id, modelID: firstModel.id, label: `${firstModel.name || firstModel.id}` });
+          if (!model && m.providers?.length) {
+            const starred = getDefaultModelKey();
+            let picked: { providerID: string; modelID: string; label: string } | null = null;
+            if (starred) {
+              const [pid, mid] = starred.split("/");
+              for (const p of m.providers) {
+                if (p.id !== pid) continue;
+                const found = Object.values<any>(p.models || {}).find((x: any) => x.id === mid);
+                if (found) {
+                  picked = { providerID: p.id, modelID: found.id, label: found.name || found.id };
+                  break;
+                }
+              }
+            }
+            if (!picked) {
+              const p = m.providers[0];
+              const firstModel = Object.values(p.models || {})[0] as any;
+              if (firstModel) picked = { providerID: p.id, modelID: firstModel.id, label: `${firstModel.name || firstModel.id}` };
+            }
+            if (picked) setModel(picked);
           }
           break;
       }
@@ -87,17 +109,70 @@ export function App() {
     setMessages([]);
   }, [activeId]);
 
+  const currentModelMeta = React.useMemo(() => {
+    if (!model) return null;
+    const p = providers.find((x: any) => x.id === model.providerID);
+    if (!p) return null;
+    const m = (p.models || {})[model.modelID];
+    if (!m) return null;
+    return m;
+  }, [providers, model]);
+
+  const variantKeys = React.useMemo(() => {
+    const v = currentModelMeta?.variants;
+    return v ? Object.keys(v) : [];
+  }, [currentModelMeta]);
+
+  const reasoningSupported = !!currentModelMeta?.capabilities?.reasoning;
+
+  React.useEffect(() => {
+    if (!model) return;
+    const key = `opencode.variant.${model.providerID}/${model.modelID}`;
+    if (variantKeys.length > 0) {
+      let saved: string | null = null;
+      try { saved = localStorage.getItem(key); } catch {}
+      const initial = saved && variantKeys.includes(saved) ? saved : (variantKeys.includes("medium") ? "medium" : variantKeys[0]);
+      setVariant(initial);
+    } else {
+      setVariant(null);
+    }
+    if (reasoningSupported && variantKeys.length === 0) {
+      let saved: string | null = null;
+      try { saved = localStorage.getItem(`opencode.thinking.${model.providerID}/${model.modelID}`); } catch {}
+      setThinking(saved == null ? true : saved === "1");
+    } else {
+      setThinking(true);
+    }
+  }, [model?.providerID, model?.modelID, variantKeys.join(","), reasoningSupported]);
+
+  const onVariantChange = (v: string | null) => {
+    setVariant(v);
+    if (model && v) {
+      try { localStorage.setItem(`opencode.variant.${model.providerID}/${model.modelID}`, v); } catch {}
+    }
+  };
+
+  const onThinkingChange = (on: boolean) => {
+    setThinking(on);
+    if (model) {
+      try { localStorage.setItem(`opencode.thinking.${model.providerID}/${model.modelID}`, on ? "1" : "0"); } catch {}
+    }
+  };
+
   const send = (text: string) => {
     if (!activeId || !text.trim() || !model) return;
     setWorking(true);
-    post({
+    const payload: any = {
       type: "sendMessage",
       sessionId: activeId,
       text,
       mode,
       providerID: model.providerID,
       modelID: model.modelID,
-    });
+    };
+    if (variant) payload.variant = variant;
+    if (reasoningSupported && variantKeys.length === 0) payload.thinking = thinking;
+    post(payload);
   };
 
   const abort = () => {
@@ -210,12 +285,19 @@ export function App() {
         onPickModel={() => setPicker(true)}
         onSend={send}
         onAbort={abort}
+        variants={variantKeys}
+        variant={variant}
+        onVariantChange={onVariantChange}
+        thinkingSupported={reasoningSupported && variantKeys.length === 0}
+        thinking={thinking}
+        onThinkingChange={onThinkingChange}
       />
       {picker && (
         <ModelPicker
           providers={providers}
           current={model}
           onClose={() => setPicker(false)}
+          onRefresh={() => post({ type: "loadProviders" })}
           onPick={(providerID, modelID, label) => {
             setModel({ providerID, modelID, label });
             if (activeId) post({ type: "setSessionModel", sessionId: activeId, providerID, modelID });

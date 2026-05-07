@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.0.9
+
+- Reasoning effort selector (low/medium/high/max) appears between the build/plan toggle and the model dropdown when the current model exposes `variants` (e.g. DeepSeek V4 Pro/Flash, MiMo V2.5, Hy3 preview, Nemotron 3 Super). Choice is persisted per model and sent as `model.variant` with each message; switching to a model without variants hides the selector and clears the saved effort
+- Thinking on/off toggle appears for models that report `reasoning: true` but expose no variants. Sends `thinking` and `providerOptions.thinking` flags; behavior depends on the upstream provider supporting a disable path
+- Bug fix: empty trailing "Thinking:" blocks no longer render under assistant messages (whitespace-only reasoning parts are skipped)
+
+## 0.0.8
+
+- Polished `glob` tool rendering — now shows the pattern, optional path, and a clean file list with a match count (replaces the raw `{"pattern":...}` JSON dump)
+- Model picker re-fetches providers each time it opens, so newly-available models appear without restarting the extension
+- Star-as-default model: click ☆/★ on any model in the picker to set it as the persistent default; new sessions auto-select the starred model on startup. Replaces the manual `opencode-ui.defaultModel` setting workflow
+- Free model badge: models reported by opencode with zero input/output cost (or "free" in their name) now render a green "Free" chip in the picker
+- API errors from opencode (e.g. `No payment method`, `CreditsError`) are no longer silent — they render as an inline error block on the offending assistant message with the status code and a clickable link, and surface as a native VSCode error notification
+
 ## 0.0.7
 
 - Interactive `question` tool: clickable option buttons, multi-select support (`multiple: true`), Submit and Reject actions inline on the message card

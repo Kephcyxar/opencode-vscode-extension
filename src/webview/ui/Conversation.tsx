@@ -110,6 +110,7 @@ function MessageBlock({ message }: { message: any }) {
     <div className="msg assistant">
       {parts.map((p, idx) => <Part key={idx} part={p} />)}
       {parts.length === 0 && message.text && <div className="part text">{message.text}</div>}
+      {message.error && <ErrorBlock error={message.error} />}
       {message.tokens && (
         <div className="msg-meta">
           {message.modelID && <span className="meta-model">{message.modelID}</span>}
@@ -126,9 +127,11 @@ function Part({ part }: { part: any }) {
   const t = part.type;
   if (t === "text") return <div className="part text"><Markdown text={part.text} /></div>;
   if (t === "reasoning" || t === "thinking") {
+    const text = (part.text || "").trim();
+    if (!text) return null;
     return (
       <div className="part thinking">
-        <span className="thinking-label">Thinking:</span> {part.text}
+        <span className="thinking-label">Thinking:</span> {text}
       </div>
     );
   }
@@ -156,7 +159,35 @@ function ToolPart({ part }: { part: any }) {
   }
   if (tool === "websearch" || tool === "web_search") return <WebSearchTool input={input} output={output} />;
   if (tool === "webfetch" || tool === "web_fetch") return <WebFetchTool input={input} output={output} />;
+  if (tool === "glob") return <GlobTool input={input} output={output} />;
   return <GenericTool part={part} />;
+}
+
+function GlobTool({ input, output }: { input: any; output: any }) {
+  const pattern: string = input.pattern || input.glob || "";
+  const path: string = input.path || "";
+  const raw = typeof output === "string" ? output : output ? tryStr(output) : "";
+  const files = raw
+    .split("\n")
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0 && !/^no\s/i.test(s));
+  return (
+    <div className="tool tool-glob">
+      <div className="tool-head">
+        <span className="tool-tag read">GLOB</span>
+        <span className="tool-desc"><code>{pattern}</code>{path ? <> in <code>{path}</code></> : null}</span>
+        {files.length > 0 && <span className="tool-chip">{files.length} match{files.length === 1 ? "" : "es"}</span>}
+      </div>
+      {files.length > 0 && (
+        <div className="glob-list">
+          {files.slice(0, 50).map((f, i) => (
+            <div key={i} className="glob-file">{f}</div>
+          ))}
+          {files.length > 50 && <div className="glob-file dim">… and {files.length - 50} more</div>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function WebSearchTool({ input, output }: { input: any; output: any }) {
@@ -548,6 +579,30 @@ function TodoTool({ input }: { input: any }) {
             </div>
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+function ErrorBlock({ error }: { error: any }) {
+  const name = error?.name || "Error";
+  const data = error?.data || {};
+  const msg: string = data.message || error?.message || tryStr(error);
+  const status = data.statusCode;
+  const urlMatch = msg.match(/https?:\/\/\S+/);
+  const url = urlMatch ? urlMatch[0].replace(/[).,]+$/, "") : null;
+  const before = url ? msg.slice(0, msg.indexOf(url)) : msg;
+  const after = url ? msg.slice(msg.indexOf(url) + url.length) : "";
+  return (
+    <div className="msg-error">
+      <div className="msg-error-head">
+        <span className="msg-error-tag">ERROR</span>
+        <span className="msg-error-name">{name}{status ? ` · ${status}` : ""}</span>
+      </div>
+      <div className="msg-error-body">
+        {before}
+        {url && <a href={url} target="_blank" rel="noreferrer">{url}</a>}
+        {after}
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
   "name": "kephcyxar-opencode-ui",
   "displayName": "OpenCode UI - CodeFude",
   "description": "Chat UI for the opencode AI coding agent.",
-  "version": "0.0.7",
+  "version": "0.0.9",
   "publisher": "CodeFude",
   "license": "MIT",
   "icon": "media/icon.png",

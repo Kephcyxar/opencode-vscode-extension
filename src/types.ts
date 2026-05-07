@@ -8,6 +8,8 @@ export interface Model {
   id: string;
   name: string;
   cost?: { input?: number; output?: number };
+  capabilities?: { reasoning?: boolean; [k: string]: any };
+  variants?: Record<string, any>;
 }
 
 export interface Session {
@@ -66,7 +68,7 @@ export type WebToHost =
   | { type: "createSession" }
   | { type: "deleteSession"; id: string }
   | { type: "selectSession"; id: string }
-  | { type: "sendMessage"; sessionId: string; text: string; mode: Mode; providerID: string; modelID: string }
+  | { type: "sendMessage"; sessionId: string; text: string; mode: Mode; providerID: string; modelID: string; variant?: string; thinking?: boolean }
   | { type: "abort"; sessionId: string }
   | { type: "loadProviders" }
   | { type: "openSessionInEditor"; sessionId: string }

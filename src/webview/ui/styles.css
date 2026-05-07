@@ -253,6 +253,56 @@ input, textarea {
   font-size: 11.5px;
 }
 
+/* Error block (in-message API errors) */
+.msg-error {
+  margin: 8px 0;
+  border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100);
+  background: var(--vscode-inputValidation-errorBackground, rgba(190, 17, 0, 0.1));
+  border-radius: 4px;
+  overflow: hidden;
+}
+.msg-error-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: 4px 10px;
+  background: var(--vscode-inputValidation-errorBorder, #be1100);
+  color: #fff;
+  font-size: 11px;
+}
+.msg-error-tag { font-weight: 700; letter-spacing: 0.06em; }
+.msg-error-name { opacity: 0.9; }
+.msg-error-body {
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--vscode-inputValidation-errorForeground, var(--vscode-foreground));
+  word-break: break-word;
+}
+.msg-error-body a { color: var(--vscode-textLink-foreground); }
+
+/* Glob */
+.glob-list {
+  padding: 6px 10px;
+  max-height: 220px;
+  overflow: auto;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11.5px;
+}
+.glob-file {
+  padding: 1px 0;
+  color: var(--vscode-descriptionForeground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.glob-file.dim { opacity: 0.6; font-style: italic; }
+.tool-head code {
+  background: var(--vscode-textCodeBlock-background, rgba(127,127,127,0.15));
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: 11px;
+}
+
 /* Todos */
 .todo-list { padding: 6px 10px; }
 .todo-item { padding: 2px 0; font-size: 12px; }
@@ -397,6 +447,28 @@ input, textarea {
 .mode-toggle button { padding: 2px 10px; background: transparent; color: inherit; border: none; cursor: pointer; font-size: 11px; }
 .mode-toggle button.active { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
 
+.effort-toggle { display: inline-flex; border: 1px solid var(--vscode-panel-border, transparent); border-radius: 10px; overflow: hidden; }
+.effort-toggle button {
+  padding: 2px 8px; background: transparent; color: var(--vscode-descriptionForeground);
+  border: none; cursor: pointer; font-size: 10.5px; text-transform: lowercase;
+  border-right: 1px solid var(--vscode-panel-border, transparent);
+}
+.effort-toggle button:last-child { border-right: none; }
+.effort-toggle button.active {
+  background: var(--vscode-charts-purple, #a371f7);
+  color: #fff;
+}
+
+.think-toggle {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 10px; cursor: pointer; font-size: 10.5px;
+  border: 1px solid var(--vscode-panel-border, transparent);
+  background: transparent; color: var(--vscode-descriptionForeground);
+}
+.think-toggle .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--vscode-descriptionForeground); }
+.think-toggle.on { color: var(--vscode-charts-purple, #a371f7); border-color: var(--vscode-charts-purple, #a371f7); }
+.think-toggle.on .dot { background: var(--vscode-charts-purple, #a371f7); }
+
 /* Model picker overlay */
 .overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,0.35);
@@ -428,6 +500,29 @@ input, textarea {
 .picker-item:hover, .picker-item.active { background: var(--vscode-list-hoverBackground); }
 .picker-item .meta { color: var(--vscode-descriptionForeground); font-size: 11px; }
 .picker-item .star { color: var(--vscode-charts-yellow, #d29922); }
+.picker-item-left { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.picker-item-right { display: inline-flex; align-items: center; gap: 8px; }
+.free-badge {
+  display: inline-block;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--vscode-charts-green, #3fb950);
+  border: 1px solid var(--vscode-charts-green, #3fb950);
+  border-radius: 3px;
+  opacity: 0.85;
+}
+.picker-item-right .active-dot { color: var(--vscode-charts-green, #3fb950); font-size: 10px; }
+.star-btn {
+  background: transparent; border: none; cursor: pointer; padding: 0 2px;
+  color: var(--vscode-descriptionForeground); font-size: 14px; line-height: 1;
+  opacity: 0.45; transition: opacity 0.1s, color 0.1s;
+}
+.picker-item:hover .star-btn { opacity: 0.85; }
+.star-btn.starred { color: var(--vscode-charts-yellow, #d29922); opacity: 1; }
+.star-btn:hover { color: var(--vscode-charts-yellow, #d29922); opacity: 1; }
 
 .tool-tag.question { background: var(--vscode-charts-purple, #a371f7); color: #fff; }
 .tool-question .question-list { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; }

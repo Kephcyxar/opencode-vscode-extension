@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { OpencodeServer } from "../server/OpencodeServer";
 import { OpencodeClient } from "../api/client";
 import { EventStream } from "../api/events";
-import { HostToWeb, WebToHost, Mode } from "../types";
+import { HostToWeb, WebToHost, Mode, Session } from "../types";
 
 const ACTIVE_SESSION_KEY = "opencode.activeSessionId";
 
@@ -12,7 +12,7 @@ export class OpencodeViewProvider implements vscode.WebviewViewProvider {
 
   private view: vscode.WebviewView | null = null;
   private editorPanels = new Map<string, vscode.WebviewPanel>();
-  private lastSessions: any[] = [];
+  private lastSessions: Session[] = [];
   private client: OpencodeClient;
   private events: EventStream;
 
@@ -36,6 +36,13 @@ export class OpencodeViewProvider implements vscode.WebviewViewProvider {
 
     this.events.onEvent((evt) => {
       this.post({ type: "event", event: evt });
+      if (evt?.type === "session.error") {
+        const err = evt.properties?.error || evt.properties;
+        const msg = err?.data?.message || err?.message || "opencode session error";
+        const name = err?.name || "Error";
+        const status = err?.data?.statusCode;
+        vscode.window.showErrorMessage(`opencode · ${name}${status ? ` (${status})` : ""}: ${msg}`);
+      }
       if (evt?.type === "permission.updated" || evt?.type === "permission.asked") {
         const p = evt.properties || {};
         const req = {
@@ -211,6 +218,8 @@ export class OpencodeViewProvider implements vscode.WebviewViewProvider {
           mode: msg.mode,
           providerID: msg.providerID,
           modelID: msg.modelID,
+          variant: msg.variant,
+          thinking: msg.thinking,
         });
         await this.refreshMessages(msg.sessionId);
         return;
