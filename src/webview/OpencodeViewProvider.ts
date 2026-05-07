@@ -52,6 +52,20 @@ export class OpencodeViewProvider implements vscode.WebviewViewProvider {
         const id = evt.properties?.id || evt.properties?.requestID;
         if (id) this.post({ type: "permissionResolved", requestId: id });
       }
+      if (evt?.type === "question.asked") {
+        const p = evt.properties || {};
+        const req = {
+          id: p.id,
+          sessionID: p.sessionID || p.sessionId,
+          questions: p.questions || [],
+          tool: p.tool,
+        };
+        if (req.id && req.sessionID) this.post({ type: "question", sessionId: req.sessionID, request: req });
+      }
+      if (evt?.type === "question.replied" || evt?.type === "question.rejected") {
+        const id = evt.properties?.id || evt.properties?.requestID;
+        if (id) this.post({ type: "questionResolved", requestId: id });
+      }
       const sid =
         evt?.properties?.sessionID ||
         evt?.properties?.info?.sessionID ||
@@ -219,6 +233,22 @@ export class OpencodeViewProvider implements vscode.WebviewViewProvider {
         }
         return;
       }
+      case "replyQuestion": {
+        try {
+          await this.client.replyQuestion(msg.requestId, msg.answers);
+        } catch (e: any) {
+          this.post({ type: "serverState", state: "error", message: `question reply failed: ${e.message}` });
+        }
+        return;
+      }
+      case "rejectQuestion": {
+        try {
+          await this.client.rejectQuestion(msg.requestId);
+        } catch (e: any) {
+          this.post({ type: "serverState", state: "error", message: `question reject failed: ${e.message}` });
+        }
+        return;
+      }
       case "setSessionModel": {
         // opencode doesn't support changing session-default model server-side;
         // we pass the model in each sendMessage instead. Just acknowledge.
@@ -244,6 +274,16 @@ export class OpencodeViewProvider implements vscode.WebviewViewProvider {
     const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const sessions = cwd ? all.filter((s: any) => !s.directory || s.directory === cwd) : all;
     this.post({ type: "sessions", sessions });
+    this.refreshPendingQuestions().catch(() => {});
+  }
+
+  private async refreshPendingQuestions() {
+    const pending = await this.client.listPendingQuestions();
+    if (!Array.isArray(pending)) return;
+    for (const req of pending) {
+      const sid = req?.sessionID || req?.sessionId;
+      if (req?.id && sid) this.post({ type: "question", sessionId: sid, request: req });
+    }
   }
 
   private async refreshMessages(sessionId: string) {

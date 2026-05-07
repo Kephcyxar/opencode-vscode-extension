@@ -5,11 +5,20 @@ interface Props {
   messages: any[];
   activeId: string | null;
   isWorking?: boolean;
+  pendingQuestions?: any[];
+  onReplyQuestion?: (requestId: string, answers: string[][]) => void;
+  onRejectQuestion?: (requestId: string) => void;
 }
 
 const LOADING_VERBS = ["Thinking", "Pondering", "Cooking", "Reasoning", "Crafting", "Brewing", "Mulling", "Noodling", "Simmering"];
 
-export function Conversation({ messages, activeId, isWorking }: Props) {
+const QuestionContext = React.createContext<{
+  pending: any[];
+  reply: (id: string, answers: string[][]) => void;
+  reject: (id: string) => void;
+}>({ pending: [], reply: () => {}, reject: () => {} });
+
+export function Conversation({ messages, activeId, isWorking, pendingQuestions, onReplyQuestion, onRejectQuestion }: Props) {
   const ref = React.useRef<HTMLDivElement>(null);
   const stickRef = React.useRef(true);
 
@@ -38,17 +47,25 @@ export function Conversation({ messages, activeId, isWorking }: Props) {
   }
 
   return (
-    <div className="convo" ref={ref} onScroll={onScroll}>
-      {messages.length === 0 && !isWorking && (
-        <div className="empty">
-          <div style={{ fontSize: 12 }}>Send a message to begin.</div>
-        </div>
-      )}
-      {messages.map((m, i) => (
-        <MessageBlock key={m.id || i} message={m} />
-      ))}
-      {isWorking && <LoadingIndicator />}
-    </div>
+    <QuestionContext.Provider
+      value={{
+        pending: pendingQuestions || [],
+        reply: onReplyQuestion || (() => {}),
+        reject: onRejectQuestion || (() => {}),
+      }}
+    >
+      <div className="convo" ref={ref} onScroll={onScroll}>
+        {messages.length === 0 && !isWorking && (
+          <div className="empty">
+            <div style={{ fontSize: 12 }}>Send a message to begin.</div>
+          </div>
+        )}
+        {messages.map((m, i) => (
+          <MessageBlock key={m.id || i} message={m} />
+        ))}
+        {isWorking && <LoadingIndicator />}
+      </div>
+    </QuestionContext.Provider>
   );
 }
 
@@ -134,7 +151,258 @@ function ToolPart({ part }: { part: any }) {
   if (tool === "read") return <ReadTool input={input} state={state} />;
   if (tool === "todowrite" || tool === "todo") return <TodoTool input={input} />;
   if (tool === "apply_patch" || tool === "applypatch") return <ApplyPatchTool input={input} />;
+  if (tool === "question" || tool === "askuserquestion" || tool === "ask_user_question" || tool === "ask_user_questions") {
+    return <QuestionTool input={input} output={output} state={state} />;
+  }
+  if (tool === "websearch" || tool === "web_search") return <WebSearchTool input={input} output={output} />;
+  if (tool === "webfetch" || tool === "web_fetch") return <WebFetchTool input={input} output={output} />;
   return <GenericTool part={part} />;
+}
+
+function WebSearchTool({ input, output }: { input: any; output: any }) {
+  const query: string = input.query || input.q || input.search || "";
+  const depth: string = input.type || input.depth || "";
+  const text = typeof output === "string" ? output : output ? tryStr(output) : "";
+  const results = parseWebSearchResults(text);
+  return (
+    <div className="tool tool-websearch">
+      <div className="tool-head">
+        <span className="tool-tag websearch">WEB SEARCH</span>
+        {query && <span className="tool-desc">"{query}"</span>}
+        {depth && <span className="tool-chip">{depth}</span>}
+      </div>
+      {results.length > 0 ? (
+        <div className="websearch-results">
+          {results.map((r, i) => (
+            <div key={i} className="websearch-result">
+              {r.url ? (
+                <a className="websearch-title" href={r.url} target="_blank" rel="noreferrer">{r.title || r.url}</a>
+              ) : (
+                <div className="websearch-title">{r.title}</div>
+              )}
+              {(r.published || r.author) && (
+                <div className="websearch-meta">
+                  {r.published && <span>{r.published}</span>}
+                  {r.author && <span>· {r.author}</span>}
+                </div>
+              )}
+              {r.snippet && <div className="websearch-snippet">{r.snippet}</div>}
+            </div>
+          ))}
+        </div>
+      ) : text ? (
+        <div className="tool-body dim">{text}</div>
+      ) : null}
+    </div>
+  );
+}
+
+type WebResult = { title?: string; url?: string; published?: string; author?: string; snippet?: string };
+
+function parseWebSearchResults(text: string): WebResult[] {
+  if (!text) return [];
+  const out: WebResult[] = [];
+  const blocks = text.split(/\n(?=Title:\s)/g);
+  for (const block of blocks) {
+    if (!/^Title:\s/.test(block)) continue;
+    const result: WebResult = {};
+    const snippetParts: string[] = [];
+    let inBody = false;
+    for (const ln of block.split("\n")) {
+      if (!inBody) {
+        const m = ln.match(/^(Title|URL|Published|Author|Highlights):\s*(.*)$/);
+        if (m) {
+          const key = m[1].toLowerCase();
+          const val = m[2].trim();
+          if (key === "title") result.title = val;
+          else if (key === "url") result.url = val;
+          else if (key === "published") result.published = val.replace(/T.*$/, "");
+          else if (key === "author" && val && val !== "N/A") result.author = val;
+          continue;
+        }
+        if (ln.trim() === "" || /^\[\.\.\.\]$/.test(ln.trim())) continue;
+        inBody = true;
+      }
+      if (inBody) snippetParts.push(ln);
+    }
+    const snippet = snippetParts.join("\n").trim().replace(/\n{3,}/g, "\n\n");
+    if (snippet) result.snippet = snippet.length > 400 ? snippet.slice(0, 400) + "…" : snippet;
+    if (result.title || result.url) out.push(result);
+  }
+  return out;
+}
+
+function WebFetchTool({ input, output }: { input: any; output: any }) {
+  const url: string = input.url || input.uri || "";
+  const prompt: string = input.prompt || input.query || "";
+  const text = typeof output === "string" ? output : output ? tryStr(output) : "";
+  const truncated = text.length > 1200 ? text.slice(0, 1200) + "…" : text;
+  return (
+    <div className="tool tool-webfetch">
+      <div className="tool-head">
+        <span className="tool-tag websearch">WEB FETCH</span>
+        {url && <a className="tool-path" href={url} target="_blank" rel="noreferrer">{url}</a>}
+      </div>
+      {prompt && <div className="webfetch-prompt">{prompt}</div>}
+      {truncated && <div className="tool-body">{truncated}</div>}
+    </div>
+  );
+}
+
+function QuestionTool({ input, output, state }: { input: any; output: any; state: any }) {
+  const ctx = React.useContext(QuestionContext);
+  const callID: string | undefined = state?.callID || state?.callId;
+  const pending = ctx.pending.find((p) => p?.tool?.callID && callID && p.tool.callID === callID)
+    || (ctx.pending.length === 1 && !output ? ctx.pending[0] : undefined);
+
+  const sourceQuestions: any[] = pending?.questions
+    || (Array.isArray(input?.questions) ? input.questions : input?.question || input?.prompt ? [input] : []);
+  const answers = parseQuestionAnswers(output);
+  const interactive = !!pending && !output;
+
+  const [selected, setSelected] = React.useState<string[][]>(() => sourceQuestions.map(() => []));
+  React.useEffect(() => {
+    setSelected(sourceQuestions.map(() => []));
+  }, [pending?.id, sourceQuestions.length]);
+
+  const toggle = (qi: number, label: string, multi: boolean) => {
+    setSelected((prev) => {
+      const next = prev.map((a) => a.slice());
+      while (next.length <= qi) next.push([]);
+      const cur = next[qi];
+      if (multi) {
+        const idx = cur.indexOf(label);
+        if (idx >= 0) cur.splice(idx, 1); else cur.push(label);
+      } else {
+        next[qi] = [label];
+      }
+      return next;
+    });
+  };
+
+  const allAnswered = interactive && selected.length === sourceQuestions.length && selected.every((a) => a.length > 0);
+
+  const submit = () => {
+    if (!pending || !allAnswered) return;
+    ctx.reply(pending.id, selected);
+  };
+  const reject = () => {
+    if (!pending) return;
+    ctx.reject(pending.id);
+  };
+
+  return (
+    <div className="tool tool-question">
+      <div className="tool-head">
+        <span className="tool-tag question">QUESTION</span>
+        {state.title && <span className="tool-desc">{state.title}</span>}
+        {interactive && <span className="tool-chip">awaiting answer</span>}
+      </div>
+      {sourceQuestions.length === 0 ? (
+        <div className="tool-body">{tryStr(input)}</div>
+      ) : (
+        <div className="question-list">
+          {sourceQuestions.map((q, i) => {
+            const text = q.question || q.prompt || q.text || "";
+            const header = q.header || q.title || q.label || "";
+            const options: any[] = Array.isArray(q.options) ? q.options : [];
+            const multi = !!(q.multiple ?? q.multiSelect);
+            const picked = answers[i];
+            const mySelections = selected[i] || [];
+            return (
+              <div key={i} className="question-card">
+                {header && <span className="question-header">{header}</span>}
+                {text && <div className="question-text">{text}</div>}
+                {options.length > 0 && (
+                  <div className="question-options">
+                    {options.map((opt, j) => {
+                      const label = typeof opt === "string" ? opt : opt.label || opt.value || "";
+                      const desc = typeof opt === "string" ? "" : opt.description || "";
+                      const isSelectedFinal = isOptionSelected(picked, label, j);
+                      const isSelectedDraft = interactive && mySelections.includes(label);
+                      const selectedFlag = isSelectedFinal || isSelectedDraft;
+                      const className = `question-option${selectedFlag ? " selected" : ""}${interactive ? " clickable" : ""}`;
+                      const content = (
+                        <>
+                          <div className="question-option-label">
+                            {selectedFlag && <span className="question-check">✓</span>}
+                            {label}
+                          </div>
+                          {desc && <div className="question-option-desc">{desc}</div>}
+                        </>
+                      );
+                      if (interactive) {
+                        return (
+                          <button
+                            key={j}
+                            type="button"
+                            className={className}
+                            onClick={() => toggle(i, label, multi)}
+                          >
+                            {content}
+                          </button>
+                        );
+                      }
+                      return <div key={j} className={className}>{content}</div>;
+                    })}
+                  </div>
+                )}
+                {multi && <div className="question-hint">multi-select</div>}
+                {picked?.customText && (
+                  <div className="question-answer">Answer: {picked.customText}</div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {interactive && (
+        <div className="question-actions">
+          <button
+            type="button"
+            className="perm-btn allow"
+            disabled={!allAnswered}
+            onClick={submit}
+          >
+            Submit
+          </button>
+          <button type="button" className="perm-btn reject" onClick={reject}>
+            Reject
+          </button>
+          {!allAnswered && <span className="question-hint">answer all questions to submit</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function parseQuestionAnswers(output: any): Record<number, any> {
+  if (!output) return {};
+  let parsed: any = output;
+  if (typeof output === "string") {
+    try { parsed = JSON.parse(output); } catch { return {}; }
+  }
+  if (Array.isArray(parsed?.answers)) {
+    const map: Record<number, any> = {};
+    parsed.answers.forEach((a: any, i: number) => { map[i] = a; });
+    return map;
+  }
+  if (Array.isArray(parsed)) {
+    const map: Record<number, any> = {};
+    parsed.forEach((a: any, i: number) => { map[i] = a; });
+    return map;
+  }
+  if (parsed && typeof parsed === "object") return { 0: parsed };
+  return {};
+}
+
+function isOptionSelected(answer: any, label: string, index: number): boolean {
+  if (!answer) return false;
+  if (answer.selectedOption === label || answer.selected === label || answer.value === label) return true;
+  if (typeof answer.selectedIndex === "number" && answer.selectedIndex === index) return true;
+  if (Array.isArray(answer.selectedOptions) && answer.selectedOptions.includes(label)) return true;
+  if (Array.isArray(answer.selected) && answer.selected.includes(label)) return true;
+  return false;
 }
 
 function ApplyPatchTool({ input }: { input: any }) {

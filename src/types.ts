@@ -48,7 +48,18 @@ export type HostToWeb =
   | { type: "providers"; providers: Provider[] }
   | { type: "event"; event: any }
   | { type: "permission"; sessionId: string; request: { id: string; tool?: string; title?: string; description?: string; metadata?: any } }
-  | { type: "permissionResolved"; requestId: string };
+  | { type: "permissionResolved"; requestId: string }
+  | { type: "question"; sessionId: string; request: QuestionRequest }
+  | { type: "questionResolved"; requestId: string };
+
+export interface QuestionOption { label: string; description?: string }
+export interface QuestionInfo { question: string; header: string; options: QuestionOption[]; multiple?: boolean; custom?: boolean }
+export interface QuestionRequest {
+  id: string;
+  sessionID: string;
+  questions: QuestionInfo[];
+  tool?: { messageID?: string; callID?: string };
+}
 
 export type WebToHost =
   | { type: "ready" }
@@ -61,4 +72,6 @@ export type WebToHost =
   | { type: "openSessionInEditor"; sessionId: string }
   | { type: "renameSession"; id: string; title: string }
   | { type: "replyPermission"; sessionId: string; requestId: string; response: "once" | "always" | "reject" }
+  | { type: "replyQuestion"; sessionId: string; requestId: string; answers: string[][] }
+  | { type: "rejectQuestion"; sessionId: string; requestId: string }
   | { type: "setSessionModel"; sessionId: string; providerID: string; modelID: string };

@@ -75,4 +75,13 @@ export class OpencodeClient {
   listProviders(): Promise<{ providers: Provider[]; default?: Record<string, string> }> {
     return this.request("GET", "/config/providers");
   }
+  replyQuestion(requestId: string, answers: string[][]): Promise<any> {
+    return this.request("POST", `/question/${requestId}/reply`, { answers });
+  }
+  rejectQuestion(requestId: string): Promise<any> {
+    return this.request("POST", `/question/${requestId}/reject`);
+  }
+  listPendingQuestions(): Promise<any[]> {
+    return this.request("GET", "/question").catch(() => []);
+  }
 }

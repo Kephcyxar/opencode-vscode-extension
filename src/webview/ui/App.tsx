@@ -23,6 +23,7 @@ export function App() {
   const [model, setModel] = React.useState<{ providerID: string; modelID: string; label: string } | null>(null);
   const [working, setWorking] = React.useState(false);
   const [pendingPerms, setPendingPerms] = React.useState<any[]>([]);
+  const [pendingQuestions, setPendingQuestions] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     const handler = (ev: MessageEvent) => {
@@ -49,6 +50,14 @@ export function App() {
           break;
         case "permissionResolved":
           setPendingPerms((p) => p.filter((x) => x.id !== m.requestId));
+          break;
+        case "question":
+          if (m.sessionId === activeId) {
+            setPendingQuestions((q) => q.find((x) => x.id === m.request.id) ? q : [...q, m.request]);
+          }
+          break;
+        case "questionResolved":
+          setPendingQuestions((q) => q.filter((x) => x.id !== m.requestId));
           break;
         case "event": {
           const evt = m.event;
@@ -112,12 +121,25 @@ export function App() {
   React.useEffect(() => {
     setWorking(false);
     setPendingPerms([]);
+    setPendingQuestions([]);
   }, [activeId]);
 
   const replyPerm = (requestId: string, response: "once" | "always" | "reject") => {
     if (!activeId) return;
     post({ type: "replyPermission", sessionId: activeId, requestId, response });
     setPendingPerms((p) => p.filter((x) => x.id !== requestId));
+  };
+
+  const replyQuestion = (requestId: string, answers: string[][]) => {
+    if (!activeId) return;
+    post({ type: "replyQuestion", sessionId: activeId, requestId, answers });
+    setPendingQuestions((q) => q.filter((x) => x.id !== requestId));
+  };
+
+  const rejectQuestion = (requestId: string) => {
+    if (!activeId) return;
+    post({ type: "rejectQuestion", sessionId: activeId, requestId });
+    setPendingQuestions((q) => q.filter((x) => x.id !== requestId));
   };
 
   const statusBar = (
@@ -152,7 +174,14 @@ export function App() {
   return (
     <div className="app">
       {statusBar}
-      <Conversation messages={messages} activeId={activeId} isWorking={working} />
+      <Conversation
+        messages={messages}
+        activeId={activeId}
+        isWorking={working}
+        pendingQuestions={pendingQuestions}
+        onReplyQuestion={replyQuestion}
+        onRejectQuestion={rejectQuestion}
+      />
       {pendingPerms.length > 0 && (
         <div className="permission-stack">
           {pendingPerms.map((p) => (

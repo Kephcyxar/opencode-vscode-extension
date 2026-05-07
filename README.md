@@ -6,7 +6,7 @@ A polished VS Code chat interface for the open-source [opencode](https://opencod
 
 ## Screenshots
 
-![OpenCode session with todo list](https://github.com/Kephcyxar/opencode-vscode-extension/blob/main/images/demo-session.png)
+![OpenCode session with todo list](images/demo-session.png)
 
 ## Features
 
