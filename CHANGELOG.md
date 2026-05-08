@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.0.11
+
+- **Font customization**: new settings `opencode-ui.fontFamily`, `opencode-ui.fontSize`, and `opencode-ui.fontLigatures` let you override the UI font and enable ligatures (e.g. Fira Code). Changes apply live without restart
+- **Hide status bar**: new `opencode-ui.hideStatusBar` setting removes the top `opencode 127.0.0.1:port` bar to reclaim vertical space
+- **Provider badge in model pill**: the composer's model pill now shows a colored circular initial (e.g. `A` for Anthropic) so you can see the provider at a glance
+- **Per-agent default model**: the model picker now has `B` and `P` buttons per model to set separate defaults for the Build and Plan agents. Switching modes automatically loads that agent's saved model
+- **Per-agent reasoning effort**: the selected reasoning effort variant is now stored per agent (build/plan) independently, so each mode can have its own default effort level
+- **@ file references**: typing `@` in the composer triggers a live workspace file search (up to 30 results). Navigate with arrow keys, confirm with Tab or Enter to insert the relative path inline
+- **Session info panel**: the ℹ button in the status bar opens a panel showing model name, provider, context window size, cost per 1M tokens, model capabilities, session token usage (input/output/reasoning), estimated cost, and a visual context usage bar
+- **Auto rename sessions**: when sending the first message to a session, the session title is automatically set to the first 60 characters of the message (fixes: now correctly detects default timestamp titles like `New session - 2026-05-08T…`)
+
 ## 0.0.10
 
 - Thinking on/off toggle now only appears when the current model's `variants` map exposes a disable key (`none`/`off`/`disabled`/`minimal`). Previously it showed for any reasoning-capable model and silently did nothing on providers that don't honor `thinking: false` (e.g. Big Pickle, MiniMax, Kimi, GLM, Qwen). When off, the disable variant is now sent as `model.variant` — the only wire format opencode currently honors

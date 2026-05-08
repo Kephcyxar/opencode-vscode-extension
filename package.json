@@ -2,7 +2,7 @@
   "name": "kephcyxar-opencode-ui",
   "displayName": "OpenCode UI - CodeFude",
   "description": "Chat UI for the opencode AI coding agent.",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "publisher": "CodeFude",
   "license": "MIT",
   "icon": "media/icon.png",
@@ -91,6 +91,26 @@
           "type": "string",
           "default": "",
           "description": "Default model id used by opencode. Empty = use opencode's default."
+        },
+        "opencode-ui.fontFamily": {
+          "type": "string",
+          "default": "",
+          "description": "Font family for the OpenCode UI. Leave empty to use the VS Code editor font. Example: \"'Fira Code', monospace\"."
+        },
+        "opencode-ui.fontSize": {
+          "type": "number",
+          "default": 0,
+          "description": "Font size (px) for the OpenCode UI. 0 = inherit from VS Code."
+        },
+        "opencode-ui.fontLigatures": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable font ligatures in the OpenCode UI."
+        },
+        "opencode-ui.hideStatusBar": {
+          "type": "boolean",
+          "default": false,
+          "description": "Hide the top status bar that shows the opencode server address."
         }
       }
     }

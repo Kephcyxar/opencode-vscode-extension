@@ -3,12 +3,22 @@ import { post } from "./vscode";
 import { Sessions } from "./Sessions";
 import { Conversation } from "./Conversation";
 import { Composer } from "./Composer";
-import { ModelPicker, getDefaultModelKey } from "./ModelPicker";
+import { ModelPicker, getDefaultModelKey, setDefaultModelKey } from "./ModelPicker";
+import { InfoPanel } from "./InfoPanel";
 
 type ServerState = "starting" | "ready" | "error" | "stopped";
 
 const SURFACE: "sidebar" | "editor" = (window as any).__OPENCODE_MODE__ === "editor" ? "editor" : "sidebar";
 const PINNED_SESSION_ID: string | null = (window as any).__OPENCODE_SESSION_ID__ || null;
+
+// Per-agent default model keys
+const AGENT_DEFAULT_KEY = (agent: "build" | "plan") => `opencode.defaultModel.${agent}`;
+const AGENT_VARIANT_KEY = (agent: "build" | "plan", providerID: string, modelID: string) =>
+  `opencode.variant.${agent}.${providerID}/${modelID}`;
+
+function getAgentDefaultModelKey(agent: "build" | "plan"): string | null {
+  try { return localStorage.getItem(AGENT_DEFAULT_KEY(agent)) || getDefaultModelKey(); } catch { return null; }
+}
 
 export function App() {
   const [serverState, setServerState] = React.useState<ServerState>("stopped");
@@ -19,6 +29,7 @@ export function App() {
   const [messages, setMessages] = React.useState<any[]>([]);
   const [providers, setProviders] = React.useState<any[]>([]);
   const [picker, setPicker] = React.useState(false);
+  const [infoPanelOpen, setInfoPanelOpen] = React.useState(false);
   const [mode, setMode] = React.useState<"build" | "plan">("build");
   const [model, setModel] = React.useState<{ providerID: string; modelID: string; label: string } | null>(null);
   const [variant, setVariant] = React.useState<string | null>(null);
@@ -26,6 +37,24 @@ export function App() {
   const [working, setWorking] = React.useState(false);
   const [pendingPerms, setPendingPerms] = React.useState<any[]>([]);
   const [pendingQuestions, setPendingQuestions] = React.useState<any[]>([]);
+  const [workspaceFiles, setWorkspaceFiles] = React.useState<string[]>([]);
+  const [uiConfig, setUiConfig] = React.useState<{ fontFamily?: string; fontSize?: number; fontLigatures?: boolean; hideStatusBar?: boolean }>({});
+
+  // Apply font/ligature config to document root
+  React.useEffect(() => {
+    const root = document.documentElement;
+    if (uiConfig.fontFamily) {
+      root.style.setProperty("--oc-font-family", uiConfig.fontFamily);
+    } else {
+      root.style.removeProperty("--oc-font-family");
+    }
+    if (uiConfig.fontSize && uiConfig.fontSize > 0) {
+      root.style.setProperty("--oc-font-size", `${uiConfig.fontSize}px`);
+    } else {
+      root.style.removeProperty("--oc-font-size");
+    }
+    root.style.setProperty("--oc-font-ligatures", uiConfig.fontLigatures ? "normal" : "none");
+  }, [uiConfig.fontFamily, uiConfig.fontSize, uiConfig.fontLigatures]);
 
   React.useEffect(() => {
     const handler = (ev: MessageEvent) => {
@@ -34,6 +63,10 @@ export function App() {
         case "init":
           setServerUrl(m.serverUrl);
           if (SURFACE === "sidebar") setActiveId(m.activeSessionId);
+          if (m.uiConfig) setUiConfig(m.uiConfig);
+          break;
+        case "uiConfig":
+          setUiConfig(m.config);
           break;
         case "serverState":
           setServerState(m.state);
@@ -65,6 +98,9 @@ export function App() {
         case "questionResolved":
           setPendingQuestions((q) => q.filter((x) => x.id !== m.requestId));
           break;
+        case "workspaceFiles":
+          setWorkspaceFiles(m.files || []);
+          break;
         case "event": {
           const evt = m.event;
           const sid = evt?.properties?.sessionID || evt?.properties?.info?.sessionID || evt?.properties?.part?.sessionID;
@@ -77,24 +113,7 @@ export function App() {
         case "providers":
           setProviders(m.providers);
           if (!model && m.providers?.length) {
-            const starred = getDefaultModelKey();
-            let picked: { providerID: string; modelID: string; label: string } | null = null;
-            if (starred) {
-              const [pid, mid] = starred.split("/");
-              for (const p of m.providers) {
-                if (p.id !== pid) continue;
-                const found = Object.values<any>(p.models || {}).find((x: any) => x.id === mid);
-                if (found) {
-                  picked = { providerID: p.id, modelID: found.id, label: found.name || found.id };
-                  break;
-                }
-              }
-            }
-            if (!picked) {
-              const p = m.providers[0];
-              const firstModel = Object.values(p.models || {})[0] as any;
-              if (firstModel) picked = { providerID: p.id, modelID: firstModel.id, label: `${firstModel.name || firstModel.id}` };
-            }
+            const picked = resolveDefaultModel(m.providers, mode);
             if (picked) setModel(picked);
           }
           break;
@@ -103,7 +122,14 @@ export function App() {
     window.addEventListener("message", handler);
     post({ type: "ready" });
     return () => window.removeEventListener("message", handler);
-  }, [activeId, model]);
+  }, [activeId, model, mode]);
+
+  // When mode changes, try to switch to the per-agent default model
+  React.useEffect(() => {
+    if (!providers.length) return;
+    const picked = resolveDefaultModel(providers, mode);
+    if (picked) setModel(picked);
+  }, [mode]);
 
   React.useEffect(() => {
     setMessages([]);
@@ -113,9 +139,7 @@ export function App() {
     if (!model) return null;
     const p = providers.find((x: any) => x.id === model.providerID);
     if (!p) return null;
-    const m = (p.models || {})[model.modelID];
-    if (!m) return null;
-    return m;
+    return (p.models || {})[model.modelID] || null;
   }, [providers, model]);
 
   const variantKeys = React.useMemo(() => {
@@ -131,10 +155,13 @@ export function App() {
 
   React.useEffect(() => {
     if (!model) return;
-    const key = `opencode.variant.${model.providerID}/${model.modelID}`;
+    const agentVariantKey = AGENT_VARIANT_KEY(mode, model.providerID, model.modelID);
+    const legacyKey = `opencode.variant.${model.providerID}/${model.modelID}`;
     if (variantKeys.length > 0) {
       let saved: string | null = null;
-      try { saved = localStorage.getItem(key); } catch {}
+      try {
+        saved = localStorage.getItem(agentVariantKey) || localStorage.getItem(legacyKey);
+      } catch {}
       const initial = saved && variantKeys.includes(saved) ? saved : (variantKeys.includes("medium") ? "medium" : variantKeys[0]);
       setVariant(initial);
     } else {
@@ -147,12 +174,15 @@ export function App() {
     } else {
       setThinking(true);
     }
-  }, [model?.providerID, model?.modelID, variantKeys.join(","), thinkingToggleSupported]);
+  }, [model?.providerID, model?.modelID, mode, variantKeys.join(","), thinkingToggleSupported]);
 
   const onVariantChange = (v: string | null) => {
     setVariant(v);
     if (model && v) {
-      try { localStorage.setItem(`opencode.variant.${model.providerID}/${model.modelID}`, v); } catch {}
+      try {
+        localStorage.setItem(AGENT_VARIANT_KEY(mode, model.providerID, model.modelID), v);
+        localStorage.setItem(`opencode.variant.${model.providerID}/${model.modelID}`, v);
+      } catch {}
     }
   };
 
@@ -226,7 +256,28 @@ export function App() {
     setPendingQuestions((q) => q.filter((x) => x.id !== requestId));
   };
 
-  const statusBar = (
+  // Token totals for info panel
+  const tokenTotals = React.useMemo(() => {
+    let input = 0, output = 0, reasoning = 0, cost = 0;
+    for (const msg of messages) {
+      if (msg.tokens) {
+        input += msg.tokens.input || 0;
+        output += msg.tokens.output || 0;
+        reasoning += msg.tokens.reasoning || 0;
+      }
+      if (typeof msg.cost === "number") cost += msg.cost;
+    }
+    return { input, output, reasoning, cost };
+  }, [messages]);
+
+  const currentProvider = React.useMemo(() => {
+    if (!model) return null;
+    return providers.find((p: any) => p.id === model.providerID) || null;
+  }, [providers, model]);
+
+  const onPickModel = () => setPicker(true);
+
+  const statusBar = !uiConfig.hideStatusBar ? (
     <div className="statusbar">
       <span className={`dot ${serverState}`} />
       <span>
@@ -235,8 +286,13 @@ export function App() {
         {serverState === "error" && `error: ${serverMsg}`}
         {serverState === "stopped" && "stopped"}
       </span>
+      <button
+        className="info-btn"
+        title="Session info"
+        onClick={() => setInfoPanelOpen((v) => !v)}
+      >ℹ</button>
     </div>
-  );
+  ) : null;
 
   if (SURFACE === "sidebar") {
     return (
@@ -258,6 +314,16 @@ export function App() {
   return (
     <div className="app">
       {statusBar}
+      {infoPanelOpen && (
+        <InfoPanel
+          messages={messages}
+          tokenTotals={tokenTotals}
+          model={model}
+          modelMeta={currentModelMeta}
+          provider={currentProvider}
+          onClose={() => setInfoPanelOpen(false)}
+        />
+      )}
       <Conversation
         messages={messages}
         activeId={activeId}
@@ -289,9 +355,10 @@ export function App() {
         disabled={!activeId || serverState !== "ready"}
         working={working}
         mode={mode}
-        onModeChange={setMode}
+        onModeChange={(m) => setMode(m)}
         modelLabel={model?.label || "select model"}
-        onPickModel={() => setPicker(true)}
+        providerName={currentProvider?.name || currentProvider?.id || ""}
+        onPickModel={onPickModel}
         onSend={send}
         onAbort={abort}
         variants={variantKeys}
@@ -300,20 +367,54 @@ export function App() {
         thinkingSupported={thinkingToggleSupported}
         thinking={thinking}
         onThinkingChange={onThinkingChange}
+        workspaceFiles={workspaceFiles}
       />
       {picker && (
         <ModelPicker
           providers={providers}
           current={model}
+          currentMode={mode}
           onClose={() => setPicker(false)}
           onRefresh={() => post({ type: "loadProviders" })}
           onPick={(providerID, modelID, label) => {
-            setModel({ providerID, modelID, label });
+            const picked = { providerID, modelID, label };
+            setModel(picked);
+            // Persist as per-agent default
+            try {
+              localStorage.setItem(AGENT_DEFAULT_KEY(mode), `${providerID}/${modelID}`);
+            } catch {}
             if (activeId) post({ type: "setSessionModel", sessionId: activeId, providerID, modelID });
             setPicker(false);
+          }}
+          onSetAgentDefault={(agent, providerID, modelID) => {
+            try {
+              localStorage.setItem(AGENT_DEFAULT_KEY(agent), `${providerID}/${modelID}`);
+              setDefaultModelKey(`${providerID}/${modelID}`);
+            } catch {}
           }}
         />
       )}
     </div>
   );
+}
+
+function resolveDefaultModel(
+  providerList: any[],
+  mode: "build" | "plan"
+): { providerID: string; modelID: string; label: string } | null {
+  const starred = getAgentDefaultModelKey(mode);
+  if (starred) {
+    const [pid, mid] = starred.split("/");
+    for (const p of providerList) {
+      if (p.id !== pid) continue;
+      const found = Object.values<any>(p.models || {}).find((x: any) => x.id === mid);
+      if (found) return { providerID: p.id, modelID: found.id, label: found.name || found.id };
+    }
+  }
+  // Fall back to first available model
+  const p = providerList[0];
+  if (!p) return null;
+  const firstModel = Object.values(p.models || {})[0] as any;
+  if (firstModel) return { providerID: p.id, modelID: firstModel.id, label: firstModel.name || firstModel.id };
+  return null;
 }

@@ -51,8 +51,9 @@ export class OpencodeClient {
     return this.request("GET", `/session/${sessionId}/message`);
   }
   sendMessage(sessionId: string, args: { text: string; mode: Mode; providerID: string; modelID: string; variant?: string; thinking?: boolean }): Promise<any> {
+    const parts: any[] = [{ type: "text", text: args.text }];
     const body: any = {
-      parts: [{ type: "text", text: args.text }],
+      parts,
       mode: args.mode,
       agent: args.mode, // newer opencode uses "agent" field; send both
     };

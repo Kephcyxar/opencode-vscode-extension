@@ -41,9 +41,16 @@ export interface Message {
 
 export type Mode = "build" | "plan";
 
+export interface UIConfig {
+  fontFamily?: string;
+  fontSize?: number;
+  fontLigatures?: boolean;
+  hideStatusBar?: boolean;
+}
+
 // Messages exchanged between extension host and webview
 export type HostToWeb =
-  | { type: "init"; serverUrl: string; activeSessionId: string | null }
+  | { type: "init"; serverUrl: string; activeSessionId: string | null; uiConfig?: UIConfig }
   | { type: "serverState"; state: "starting" | "ready" | "error" | "stopped"; message?: string }
   | { type: "sessions"; sessions: Session[] }
   | { type: "messages"; sessionId: string; messages: Message[] }
@@ -52,7 +59,9 @@ export type HostToWeb =
   | { type: "permission"; sessionId: string; request: { id: string; tool?: string; title?: string; description?: string; metadata?: any } }
   | { type: "permissionResolved"; requestId: string }
   | { type: "question"; sessionId: string; request: QuestionRequest }
-  | { type: "questionResolved"; requestId: string };
+  | { type: "questionResolved"; requestId: string }
+  | { type: "uiConfig"; config: UIConfig }
+  | { type: "workspaceFiles"; files: string[] };
 
 export interface QuestionOption { label: string; description?: string }
 export interface QuestionInfo { question: string; header: string; options: QuestionOption[]; multiple?: boolean; custom?: boolean }
@@ -76,4 +85,5 @@ export type WebToHost =
   | { type: "replyPermission"; sessionId: string; requestId: string; response: "once" | "always" | "reject" }
   | { type: "replyQuestion"; sessionId: string; requestId: string; answers: string[][] }
   | { type: "rejectQuestion"; sessionId: string; requestId: string }
-  | { type: "setSessionModel"; sessionId: string; providerID: string; modelID: string };
+  | { type: "setSessionModel"; sessionId: string; providerID: string; modelID: string }
+  | { type: "listWorkspaceFiles"; query: string };

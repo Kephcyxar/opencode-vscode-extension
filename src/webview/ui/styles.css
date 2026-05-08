@@ -5,13 +5,15 @@ html, body, #root {
   padding: 0;
   background: var(--vscode-sideBar-background);
   color: var(--vscode-foreground);
-  font-family: var(--vscode-font-family);
-  font-size: var(--vscode-font-size);
+  font-family: var(--oc-font-family, var(--vscode-font-family));
+  font-size: var(--oc-font-size, var(--vscode-font-size));
+  font-variant-ligatures: var(--oc-font-ligatures, none);
 }
 button { font-family: inherit; font-size: inherit; }
 input, textarea {
-  font-family: var(--vscode-editor-font-family, var(--vscode-font-family));
+  font-family: var(--oc-font-family, var(--vscode-editor-font-family, var(--vscode-font-family)));
   font-size: inherit;
+  font-variant-ligatures: var(--oc-font-ligatures, none);
   color: inherit;
   background: transparent;
   border: none;
@@ -625,3 +627,114 @@ button.question-option.clickable:hover {
   color: var(--vscode-descriptionForeground);
   padding: 4px 10px 0;
 }
+
+/* Statusbar info button */
+.statusbar { position: relative; }
+.info-btn {
+  margin-left: auto;
+  background: transparent; border: none;
+  color: var(--vscode-descriptionForeground);
+  cursor: pointer; font-size: 12px; padding: 0 4px;
+  opacity: 0.6; line-height: 1;
+}
+.info-btn:hover { opacity: 1; }
+
+/* Provider badge in model pill */
+.provider-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--vscode-charts-purple, #a371f7);
+  color: #fff; font-size: 9px; font-weight: 700;
+  margin-right: 2px; flex-shrink: 0;
+}
+
+/* Composer input wrapper for @ suggestions */
+.composer-input-wrap { position: relative; }
+.at-suggestions {
+  position: absolute; bottom: 100%; left: 0; right: 0;
+  background: var(--vscode-quickInput-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-panel-border, transparent);
+  border-radius: 4px;
+  box-shadow: 0 -4px 12px rgba(0,0,0,0.3);
+  max-height: 160px; overflow-y: auto;
+  z-index: 50;
+  margin-bottom: 2px;
+}
+.at-suggestion {
+  padding: 5px 10px;
+  font-size: 12px;
+  font-family: var(--vscode-editor-font-family);
+  cursor: pointer;
+  color: var(--vscode-foreground);
+}
+.at-suggestion:hover, .at-suggestion.active {
+  background: var(--vscode-list-hoverBackground);
+}
+
+/* Agent-default buttons in model picker */
+.agent-default-btn {
+  background: transparent; border: 1px solid var(--vscode-panel-border, rgba(127,127,127,0.3));
+  cursor: pointer; padding: 1px 5px; font-size: 10px; font-weight: 700;
+  border-radius: 3px; color: var(--vscode-descriptionForeground);
+  opacity: 0.45; transition: opacity 0.1s, background 0.1s;
+}
+.picker-item:hover .agent-default-btn { opacity: 0.85; }
+.agent-default-btn.set {
+  background: var(--vscode-charts-blue, #58a6ff);
+  color: #fff; border-color: transparent; opacity: 1;
+}
+.agent-default-btn:hover { opacity: 1; background: var(--vscode-list-hoverBackground); }
+.agent-default-btn.set:hover { filter: brightness(1.1); }
+
+/* Info panel */
+.info-panel {
+  flex: 0 0 auto;
+  max-height: 45%;
+  overflow-y: auto;
+  border-bottom: 1px solid var(--vscode-panel-border, transparent);
+  background: var(--vscode-sideBar-background);
+  font-size: 12px;
+}
+.info-panel-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 12px;
+  font-weight: 700; font-size: 11.5px;
+  background: var(--vscode-sideBarSectionHeader-background, transparent);
+  border-bottom: 1px solid var(--vscode-panel-border, transparent);
+  position: sticky; top: 0; z-index: 1;
+}
+.info-panel-title { letter-spacing: 0.04em; }
+.info-panel-close {
+  background: transparent; border: none; cursor: pointer;
+  color: var(--vscode-descriptionForeground); font-size: 15px; line-height: 1;
+  opacity: 0.7;
+}
+.info-panel-close:hover { opacity: 1; }
+.info-panel-body { padding: 6px 12px 10px; }
+.info-section { margin-bottom: 12px; }
+.info-section-label {
+  font-size: 9.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--vscode-descriptionForeground); margin-bottom: 4px;
+}
+.info-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  padding: 2px 0; gap: 8px;
+}
+.info-key { color: var(--vscode-descriptionForeground); flex-shrink: 0; }
+.info-val { color: var(--vscode-foreground); text-align: right; word-break: break-all; }
+.info-val.info-mono { font-family: var(--vscode-editor-font-family); font-size: 11px; }
+.info-val.info-bold { font-weight: 700; }
+
+/* Context bar */
+.context-bar-wrap {
+  height: 6px; border-radius: 3px;
+  background: var(--vscode-panel-border, rgba(127,127,127,0.2));
+  overflow: hidden; margin: 2px 0;
+}
+.context-bar-fill {
+  height: 100%; border-radius: 3px;
+  background: var(--vscode-charts-green, #3fb950);
+  transition: width 0.3s;
+}
+.context-bar-fill.warn { background: var(--vscode-charts-yellow, #d29922); }
+.context-bar-fill.danger { background: var(--vscode-errorForeground, #f85149); }

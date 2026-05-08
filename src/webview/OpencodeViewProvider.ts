@@ -1,8 +1,9 @@
 import * as vscode from "vscode";
+import * as path from "path";
 import { OpencodeServer } from "../server/OpencodeServer";
 import { OpencodeClient } from "../api/client";
 import { EventStream } from "../api/events";
-import { HostToWeb, WebToHost, Mode, Session } from "../types";
+import { HostToWeb, WebToHost, Mode, Session, UIConfig } from "../types";
 
 const ACTIVE_SESSION_KEY = "opencode.activeSessionId";
 
@@ -31,6 +32,12 @@ export class OpencodeViewProvider implements vscode.WebviewViewProvider {
         this.events.start();
         await this.refreshSessions();
         await this.refreshProviders();
+      }
+    });
+
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration("opencode-ui")) {
+        this.post({ type: "uiConfig", config: this.getUIConfig() });
       }
     });
 
@@ -113,10 +120,20 @@ export class OpencodeViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
+  private getUIConfig(): UIConfig {
+    const cfg = vscode.workspace.getConfiguration("opencode-ui");
+    return {
+      fontFamily: cfg.get<string>("fontFamily") || "",
+      fontSize: cfg.get<number>("fontSize") || 0,
+      fontLigatures: cfg.get<boolean>("fontLigatures") ?? false,
+      hideStatusBar: cfg.get<boolean>("hideStatusBar") ?? false,
+    };
+  }
+
   private pushInitialStateToSidebar() {
     if (!this.view) return;
     const active = this.ctx.workspaceState.get<string>(ACTIVE_SESSION_KEY) || null;
-    this.view.webview.postMessage({ type: "init", serverUrl: this.server.url, activeSessionId: active } as HostToWeb);
+    this.view.webview.postMessage({ type: "init", serverUrl: this.server.url, activeSessionId: active, uiConfig: this.getUIConfig() } as HostToWeb);
     this.view.webview.postMessage({ type: "serverState", state: this.server.state } as HostToWeb);
     if (this.server.state === "ready") {
       this.refreshSessions().catch(() => {});
@@ -166,7 +183,7 @@ export class OpencodeViewProvider implements vscode.WebviewViewProvider {
   }
 
   private pushInitialStateToPanel(panel: vscode.WebviewPanel, sessionId: string) {
-    panel.webview.postMessage({ type: "init", serverUrl: this.server.url, activeSessionId: sessionId } as HostToWeb);
+    panel.webview.postMessage({ type: "init", serverUrl: this.server.url, activeSessionId: sessionId, uiConfig: this.getUIConfig() } as HostToWeb);
     panel.webview.postMessage({ type: "serverState", state: this.server.state } as HostToWeb);
     if (this.server.state === "ready") {
       this.refreshSessions().catch(() => {});
@@ -221,6 +238,20 @@ export class OpencodeViewProvider implements vscode.WebviewViewProvider {
           variant: msg.variant,
           thinking: msg.thinking,
         });
+        // Auto-rename session from first user message if title looks like the default timestamp title.
+        // Re-fetch from API rather than relying on lastSessions which may be stale for a newly opened session.
+        try {
+          const allSessions = await this.client.listSessions();
+          const session = allSessions.find((s: any) => s.id === msg.sessionId);
+          const isDefaultTitle = !session?.title || /^New session/i.test(session.title);
+          if (session && isDefaultTitle) {
+            const title = msg.text.trim().slice(0, 60).replace(/\n/g, " ") || "New session";
+            await this.client.updateSession(msg.sessionId, { title });
+            await this.refreshSessions();
+            const panel = this.editorPanels.get(msg.sessionId);
+            if (panel) panel.title = `OpenCode · ${title}`;
+          }
+        } catch { /* ignore rename errors */ }
         await this.refreshMessages(msg.sessionId);
         return;
       }
@@ -274,6 +305,31 @@ export class OpencodeViewProvider implements vscode.WebviewViewProvider {
         if (panel) panel.title = `OpenCode · ${msg.title}`;
         return;
       }
+      case "listWorkspaceFiles": {
+        const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!cwd) { this.postToSource(pinnedSessionId, { type: "workspaceFiles", files: [] }); return; }
+        const q = (msg.query || "").toLowerCase();
+        try {
+          const uris = await vscode.workspace.findFiles("**/*", "**/node_modules/**", 200);
+          const files = uris
+            .map((u) => path.relative(cwd, u.fsPath).replace(/\\/g, "/"))
+            .filter((f) => !q || f.toLowerCase().includes(q))
+            .slice(0, 30);
+          this.postToSource(pinnedSessionId, { type: "workspaceFiles", files });
+        } catch {
+          this.postToSource(pinnedSessionId, { type: "workspaceFiles", files: [] });
+        }
+        return;
+      }
+    }
+  }
+
+  private postToSource(pinnedSessionId: string | undefined, msg: any) {
+    if (pinnedSessionId) {
+      const panel = this.editorPanels.get(pinnedSessionId);
+      panel?.webview.postMessage(msg);
+    } else {
+      this.view?.webview.postMessage(msg);
     }
   }
 
